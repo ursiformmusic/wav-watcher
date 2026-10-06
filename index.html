@@ -1,0 +1,784 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Wav Watcher</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  /* night: navy, amber, glacier cyan */
+  --bg:#151B24; --panel:#1B2330; --panel2:#202A38; --line:#2B3645; --deep:#0F141B;
+  --ink:#E9EEF3; --muted:#8C9AAA; --dim:#5C6978;
+  --a:#F2B263; --a-rgb:242,178,99; --a-soft:rgba(242,178,99,.18);
+  --b:#5FD3C8; --b-rgb:95,211,200; --b-soft:rgba(95,211,200,.18);
+  --deep-rgb:15,20,27; --grid:rgba(255,255,255,.08); --band:rgba(255,255,255,.09); --tag:#13181F;
+  --radius:10px;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+}
+:root[data-theme="forest"]{
+  /* forest floor: navy night, moss, bark, chanterelle */
+  --bg:#0E1A1F; --panel:#15242A; --panel2:#1B2E33; --line:#2F3A33; --deep:#0A1418;
+  --ink:#EDE6D6; --muted:#9AA892; --dim:#5F6D5A;
+  --a:#E8913A; --a-rgb:232,145,58; --a-soft:rgba(232,145,58,.18);
+  --b:#7CC48C; --b-rgb:124,196,140; --b-soft:rgba(124,196,140,.18);
+  --deep-rgb:10,20,24;
+}
+:root[data-theme="ember"]{
+  /* ember: charcoal, coal-red, brass */
+  --bg:#191516; --panel:#221C1D; --panel2:#2A2223; --line:#3A2F30; --deep:#120F10;
+  --ink:#F1E9E3; --muted:#A4948F; --dim:#6B5C58;
+  --a:#E4583F; --a-rgb:228,88,63; --a-soft:rgba(228,88,63,.18);
+  --b:#E2B856; --b-rgb:226,184,86; --b-soft:rgba(226,184,86,.18);
+  --deep-rgb:18,15,16;
+}
+:root[data-theme="dusk"]{
+  /* dusk: indigo, magenta, sun yellow */
+  --bg:#171528; --panel:#1F1C35; --panel2:#262242; --line:#342F56; --deep:#100E1E;
+  --ink:#EEEAFB; --muted:#9A93BD; --dim:#5F5986;
+  --a:#F06CB2; --a-rgb:240,108,178; --a-soft:rgba(240,108,178,.18);
+  --b:#F4D35E; --b-rgb:244,211,94; --b-soft:rgba(244,211,94,.18);
+  --deep-rgb:16,14,30;
+}
+:root[data-theme="glacier"]{
+  /* glacier: a light one — snow, slate, deep blue, teal */
+  --bg:#EEF2F5; --panel:#FFFFFF; --panel2:#F3F6F8; --line:#D6DEE5; --deep:#E3E9EE;
+  --ink:#172230; --muted:#5E6F80; --dim:#93A1AF;
+  --a:#1F5FB0; --a-rgb:31,95,176; --a-soft:rgba(31,95,176,.14);
+  --b:#0F9B8E; --b-rgb:15,155,142; --b-soft:rgba(15,155,142,.14);
+  --deep-rgb:227,233,238; --grid:rgba(0,0,0,.08); --band:rgba(0,0,0,.07); --tag:#FFFFFF;
+}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*,*::before,*::after{box-sizing:inherit}
+html,body{margin:0;background:var(--bg);color:var(--ink);font-family:"Space Grotesk",system-ui,"Segoe UI",Helvetica,Arial,sans-serif;font-size:14px;line-height:1.45;font-variant-numeric:tabular-nums}
+body{min-height:100%}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+button:focus-visible,label:focus-within,[tabindex]:focus-visible{outline:2px solid var(--b);outline-offset:2px}
+
+header{display:flex;align-items:baseline;gap:16px;padding:18px 24px 8px}
+header h1{margin:0;font-size:22px;font-weight:600;letter-spacing:-.01em}
+header p{margin:0;color:var(--muted)}
+header #png{margin-left:auto;font-size:12px}
+header #theme{font:inherit;font-size:12px;color:var(--muted);background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:3px 8px}
+header .ver{color:var(--dim);font-size:12px}
+
+main{padding:8px 24px 48px;max-width:1500px;margin:0 auto}
+section{margin-top:18px}
+
+/* decks */
+.decks{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.deck{position:relative;border:1.5px dashed var(--line);border-radius:var(--radius);padding:14px 16px;min-height:88px;background:var(--panel);transition:border-color .15s,background .15s;cursor:pointer}
+.deck.A{--c:var(--a);--soft:var(--a-soft)} .deck.B{--c:var(--b);--soft:var(--b-soft)}
+.deck.over{border-color:var(--c);background:var(--soft)}
+.deck.loaded{border-style:solid;border-color:var(--line)}
+.deck .tag{position:absolute;top:12px;right:14px;width:28px;height:28px;border-radius:50%;display:grid;place-items:center;background:var(--c);color:var(--tag);font-weight:600}
+.deck .name{font-weight:500;font-size:15px;padding-right:40px;word-break:break-all}
+.deck .hint{color:var(--muted)}
+.deck .spec{color:var(--muted);margin-top:4px}
+.deck .busy{color:var(--c)}
+.deck .stats{display:flex;gap:18px;flex-wrap:wrap;margin-top:10px;font-size:15px}
+.deck .stats b{font-weight:600;color:var(--c)}
+.deck .stats span{color:var(--muted);font-size:12px;display:block}
+.deck input{display:none}
+
+/* transport */
+.transport{display:flex;align-items:center;gap:18px;flex-wrap:wrap;background:var(--panel);border-radius:var(--radius);padding:12px 16px}
+.play{width:44px;height:44px;border-radius:50%;background:var(--ink);color:var(--bg);display:grid;place-items:center}
+.play:disabled{opacity:.3;cursor:default}
+.play svg{width:18px;height:18px;fill:currentColor}
+.ab{display:flex;border:1.5px solid var(--line);border-radius:999px;overflow:hidden}
+.ab button{padding:10px 26px;font-weight:600;font-size:16px;color:var(--muted);transition:background .12s,color .12s}
+.ab button.on.A{background:var(--a);color:var(--tag)} .ab button.on.B{background:var(--b);color:var(--tag)}
+.ab button:disabled{opacity:.4;cursor:default}
+.time{font-size:18px;font-weight:500;min-width:150px}
+.time span{color:var(--muted);font-weight:400}
+.opts{display:flex;gap:16px;flex-wrap:wrap;color:var(--muted)}
+.opts label{display:flex;align-items:center;gap:7px;cursor:pointer}
+.opts input{accent-color:var(--b);width:15px;height:15px;margin:0}
+.keys{margin-left:auto;color:var(--dim);font-size:12px}
+.lnk{color:var(--muted);text-decoration:underline;text-underline-offset:3px;padding:0}.lnk:hover:not(:disabled){color:var(--ink)}.lnk:disabled{opacity:.4;cursor:default}
+.keys kbd{border:1px solid var(--line);border-radius:4px;padding:0 5px;color:var(--muted)}
+
+/* panels */
+.panel{background:var(--panel);border-radius:var(--radius);padding:14px 16px}
+.panel h2{margin:0 0 10px;font-size:14px;font-weight:500;color:var(--muted);display:flex;align-items:baseline;gap:14px}
+.panel h2 .read{color:var(--ink);font-weight:400;margin-left:auto}
+.swatch{display:inline-block;width:10px;height:10px;border-radius:2px;vertical-align:middle;margin-right:5px}
+.swatch.A{background:var(--a)} .swatch.B{background:var(--b)}
+
+.wave-wrap{position:relative;height:260px}
+.wave-wrap canvas{position:absolute;inset:0;width:100%;height:100%;display:block;border-radius:6px}
+#cursor{cursor:crosshair}
+
+.spec-wrap{position:relative;height:300px}
+.spec-wrap canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+
+.grams{display:grid;gap:10px}
+.gram{position:relative;height:160px}
+.gram canvas{width:100%;height:100%;display:block;border-radius:6px;background:var(--deep)}
+.gram .lbl{position:absolute;left:8px;top:6px;font-weight:600;font-size:12px;padding:1px 7px;border-radius:4px;color:var(--tag)}
+.gram.A .lbl{background:var(--a)} .gram.B .lbl{background:var(--b)}
+
+/* numbers */
+.numbers{display:grid;grid-template-columns:330px 1fr 1fr;gap:14px}
+.gonio{aspect-ratio:1;background:var(--deep);border-radius:6px;margin-bottom:10px}.gonio canvas{width:100%;height:100%;display:block}
+.scroll{overflow-x:auto}#tblBatch td,#tblBatch th{white-space:nowrap}#tblBatch tbody tr.row{cursor:pointer}#tblBatch tbody tr.row:hover td{background:var(--band)}#tblBatch tr.isB td{color:var(--b)}#tblBatch tr.isA td{color:var(--a)}
+table{width:100%;border-collapse:collapse}
+th,td{padding:7px 8px;text-align:right;border-bottom:1px solid var(--line)}
+th{color:var(--muted);font-weight:500}
+td:first-child,th:first-child{text-align:left;color:var(--muted)}
+th.A{color:var(--a)} th.B{color:var(--b)}
+td.d{color:var(--muted)} td.d.pos::before{content:"+"}
+td.d.big{color:var(--ink)}
+tr:last-child td{border-bottom:0}
+.empty{color:var(--dim);padding:28px 0;text-align:center}
+
+@media (max-width:1100px){.numbers{grid-template-columns:1fr 1fr}.stereo{grid-column:1/-1}}
+@media (max-width:860px){
+  .decks,.numbers{grid-template-columns:1fr}
+  header,main{padding-left:14px;padding-right:14px}
+  .keys{display:none}
+  .wave-wrap{height:220px}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<header>
+  <h1>Wav Watcher</h1>
+  <p>Drop two files. See where they differ.</p>
+  <button class="lnk" id="png" disabled>Export PNG</button><select id="theme" aria-label="Theme"><option value="night">Night</option><option value="forest">Forest</option><option value="ember">Ember</option><option value="dusk">Dusk</option><option value="glacier">Glacier</option></select><span class="ver">v0.3</span>
+</header>
+
+<main>
+  <section class="decks">
+    <label class="deck A" id="deckA" tabindex="0">
+      <span class="tag">A</span>
+      <div class="name">Reference</div>
+      <div class="hint">Drop a WAV here, or click to choose</div>
+      <div class="spec"></div>
+      <div class="stats"></div>
+      <input type="file" accept="audio/*,.wav,.aif,.aiff,.flac,.mp3">
+    </label>
+    <label class="deck B" id="deckB" tabindex="0">
+      <span class="tag">B</span>
+      <div class="name">Your mix</div>
+      <div class="hint">Drop a WAV here, or click to choose</div>
+      <div class="spec"></div>
+      <div class="stats"></div>
+      <input type="file" accept="audio/*,.wav,.aif,.aiff,.flac,.mp3">
+    </label>
+  </section>
+
+  <section class="transport">
+    <button class="play" id="play" disabled aria-label="Play">
+      <svg viewBox="0 0 20 20" id="icoPlay"><path d="M5 3l12 7-12 7z"/></svg>
+      <svg viewBox="0 0 20 20" id="icoPause" style="display:none"><path d="M4 3h4v14H4zM12 3h4v14h-4z"/></svg>
+    </button>
+    <div class="ab" role="group" aria-label="Listen to">
+      <button class="A on" id="selA" disabled>A</button>
+      <button class="B" id="selB" disabled>B</button>
+    </div>
+    <div class="time" id="time">0:00.0 <span>/ 0:00.0</span></div>
+    <div class="opts">
+      <label><input type="checkbox" id="optMatch"> Match loudness</label>
+      <label><input type="checkbox" id="optOverlay"> Overlay waveforms</label>
+      <label><input type="checkbox" id="optLoop"> Loop</label>
+      <button class="lnk" id="swap" disabled>Swap A/B</button>
+    </div>
+    <div class="keys"><kbd>Space</kbd> play · <kbd>A</kbd>/<kbd>B</kbd>/<kbd>Tab</kbd> switch · <kbd>←</kbd><kbd>→</kbd> 5 s · drag to select · wheel to zoom · <kbd>Z</kbd> reset</div>
+  </section>
+
+  <section class="panel">
+    <h2>Waveform <span class="swatch A"></span>A <span class="swatch B"></span>B <span class="read" id="waveRead"></span></h2>
+    <div class="wave-wrap">
+      <canvas id="wave"></canvas>
+      <canvas id="cursor"></canvas>
+    </div>
+  </section>
+
+  <section class="numbers">
+    <div class="panel stereo">
+      <h2>Stereo <span class="read" id="stereoRead"></span></h2>
+      <div class="gonio"><canvas id="gonio"></canvas></div>
+      <table id="tblStereo"><tbody></tbody></table>
+    </div>
+    <div class="panel">
+      <h2>Loudness and level <button class="lnk read" id="copy" disabled>Copy report</button></h2>
+      <table id="tblLevel"><tbody><tr><td class="empty" colspan="4">Load A and B to compare</td></tr></tbody></table>
+    </div>
+    <div class="panel">
+      <h2>Tonal balance <span class="read">average level per band, dBFS</span></h2>
+      <table id="tblBands"><tbody><tr><td class="empty" colspan="4">Load A and B to compare</td></tr></tbody></table>
+    </div>
+  </section>
+
+  <section class="panel" id="batchPanel">
+    <h2>Batch <span class="read"><button class="lnk" id="addBatch">Add files</button> · compares every file against A; click a row to load it as B</span></h2>
+    <input type="file" id="batchInput" multiple accept="audio/*,.wav,.aif,.aiff,.flac,.mp3" style="display:none">
+    <div class="scroll"><table id="tblBatch"><tbody><tr><td class="empty" colspan="11">Drop a folder's worth of mixes anywhere on the page, or add files</td></tr></tbody></table></div>
+  </section>
+
+  <section class="panel">
+    <h2>Spectrum <span class="swatch A"></span>A <span class="swatch B"></span>B <span class="read" id="specRead">hover for values</span></h2>
+    <div class="spec-wrap"><canvas id="spec"></canvas></div>
+  </section>
+
+  <section class="panel">
+    <h2>Spectrograms</h2>
+    <div class="grams">
+      <div class="gram A"><span class="lbl">A</span><canvas id="gramA"></canvas></div>
+      <div class="gram B"><span class="lbl">B</span><canvas id="gramB"></canvas></div>
+    </div>
+  </section>
+</main>
+
+<script>
+(() => {
+'use strict';
+const $ = s => document.querySelector(s);
+const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+let COL = {A: css('--a'), B: css('--b')};
+const dB = x => 20*Math.log10(Math.max(x, 1e-6));
+const fmtT = s => { s = Math.max(0, s); const m = Math.floor(s/60); return m + ':' + (s - m*60).toFixed(1).padStart(4,'0'); };
+const nextFrame = () => new Promise(r => setTimeout(r, 0));
+
+/* ---------- FFT ---------- */
+class FFT {
+  constructor(n){
+    this.n = n; const bits = Math.log2(n);
+    this.rev = new Uint32Array(n);
+    for (let i=0;i<n;i++){ let r=0,x=i; for(let b=0;b<bits;b++){ r=(r<<1)|(x&1); x>>=1; } this.rev[i]=r; }
+    this.cos = new Float32Array(n/2); this.sin = new Float32Array(n/2);
+    for (let i=0;i<n/2;i++){ this.cos[i]=Math.cos(-2*Math.PI*i/n); this.sin[i]=Math.sin(-2*Math.PI*i/n); }
+    this.re = new Float32Array(n); this.im = new Float32Array(n);
+    this.win = new Float32Array(n);
+    for (let i=0;i<n;i++) this.win[i] = 0.5 - 0.5*Math.cos(2*Math.PI*i/n);
+  }
+  // power spectrum (n/2 bins) of data[off..off+n), Hann windowed, scaled so a full-scale sine = 1.0
+  power(data, off, out){
+    const n=this.n, re=this.re, im=this.im, rev=this.rev, w=this.win;
+    for (let i=0;i<n;i++){ const j=rev[i]; re[i] = (off+j<data.length? data[off+j]:0)*w[j]; im[i]=0; }
+    for (let size=2; size<=n; size<<=1){
+      const half=size>>1, step=n/size;
+      for (let i=0;i<n;i+=size){
+        for (let j=0,k=0;j<half;j++,k+=step){
+          const a=i+j, b=a+half;
+          const tr = re[b]*this.cos[k]-im[b]*this.sin[k];
+          const ti = re[b]*this.sin[k]+im[b]*this.cos[k];
+          re[b]=re[a]-tr; im[b]=im[a]-ti; re[a]+=tr; im[a]+=ti;
+        }
+      }
+    }
+    const s = 4/n; // Hann coherent gain 0.5 → amplitude = 2*|X|/(N*0.5)
+    for (let i=0;i<n/2;i++){ const a = Math.hypot(re[i],im[i])*s; out[i] = a*a; }
+    return out;
+  }
+}
+const fft4k = new FFT(4096), fft2k = new FFT(2048), fft1k = new FFT(1024);
+
+/* ---------- WAV header ---------- */
+// Native WAV decode (PCM 16/24/32, float 32/64) so analysis runs at the file's own rate.
+// Returns null for anything else → falls back to decodeAudioData.
+function decodeWav(buf){
+  const v = new DataView(buf);
+  if (buf.byteLength < 12 || v.getUint32(0,false) !== 0x52494646 || v.getUint32(8,false) !== 0x57415645) return null;
+  let p = 12, fmt=null, data=null;
+  while (p + 8 <= buf.byteLength){
+    const id = v.getUint32(p,false), sz = Math.min(v.getUint32(p+4,true), buf.byteLength-p-8);
+    if (id === 0x666d7420){ // 'fmt '
+      let tag = v.getUint16(p+8,true);
+      if (tag===0xFFFE && sz>=40) tag = v.getUint16(p+8+24,true); // extensible: subformat GUID starts with the real tag
+      fmt = {tag, nch: v.getUint16(p+10,true), fs: v.getUint32(p+12,true), bits: v.getUint16(p+22,true), block: v.getUint16(p+20,true)};
+    } else if (id === 0x64617461){ data = {off:p+8, len:sz}; } // 'data'
+    p += 8 + sz + (sz&1);
+  }
+  if (!fmt || !data) return null;
+  const {tag,nch,fs,bits,block} = fmt, bps=bits/8, n=Math.floor(data.len/block);
+  const kind = tag===3?'float':tag===1?'pcm':null; if (!kind) return null;
+  const chs=[]; for (let c=0;c<nch;c++) chs.push(new Float32Array(n));
+  const o=data.off;
+  for (let c=0;c<nch;c++){ const d=chs[c]; let q=o+c*bps;
+    if (kind==='pcm'&&bits===16){ for (let i=0;i<n;i++,q+=block) d[i]=v.getInt16(q,true)/32768; }
+    else if (kind==='pcm'&&bits===24){ for (let i=0;i<n;i++,q+=block){ const s=(v.getUint8(q)|(v.getUint8(q+1)<<8)|(v.getInt8(q+2)<<16)); d[i]=s/8388608; } }
+    else if (kind==='pcm'&&bits===32){ for (let i=0;i<n;i++,q+=block) d[i]=v.getInt32(q,true)/2147483648; }
+    else if (kind==='pcm'&&bits===8){ for (let i=0;i<n;i++,q+=block) d[i]=(v.getUint8(q)-128)/128; }
+    else if (kind==='float'&&bits===32){ for (let i=0;i<n;i++,q+=block) d[i]=v.getFloat32(q,true); }
+    else if (kind==='float'&&bits===64){ for (let i=0;i<n;i++,q+=block) d[i]=v.getFloat64(q,true); }
+    else return null; }
+  return {fs, nch, bits, kind, length:n, duration:n/fs, chs, sampleRate:fs, numberOfChannels:nch, getChannelData:c=>chs[c]};
+}
+
+/* ---------- K-weighting (ITU-R BS.1770) ---------- */
+function biquad(fs, type){
+  // De Man parameterization — reproduces the published 48 kHz coefficients exactly, works at any rate
+  const f0 = type==='hs'?1681.9744509555319:38.13547087613982, Q = type==='hs'?0.7071752369554193:0.5003270373253953;
+  const K=Math.tan(Math.PI*f0/fs), K2=K*K, a0=1+K/Q+K2;
+  if (type==='hs'){ const Vh=Math.pow(10,3.99984385397/20), Vb=Math.pow(Vh,0.499666774155);
+    return [(Vh+Vb*K/Q+K2)/a0, 2*(K2-Vh)/a0, (Vh-Vb*K/Q+K2)/a0, 2*(K2-1)/a0, (1-K/Q+K2)/a0]; }
+  return [1, -2, 1, 2*(K2-1)/a0, (1-K/Q+K2)/a0];
+}
+function filt(x, c){
+  const [b0,b1,b2,a1,a2] = c, y = new Float32Array(x.length);
+  let x1=0,x2=0,y1=0,y2=0;
+  for (let i=0;i<x.length;i++){ const xi=x[i]; const yi = b0*xi+b1*x1+b2*x2-a1*y1-a2*y2; x2=x1; x1=xi; y2=y1; y1=yi; y[i]=yi; }
+  return y;
+}
+
+/* ---------- analysis ---------- */
+async function analyze(ab, meta){
+  const fs = ab.sampleRate, nch = ab.numberOfChannels, len = ab.length;
+  const chs = []; for (let c=0;c<nch;c++) chs.push(ab.getChannelData(c));
+  const r = {fs, nch, len, dur: ab.duration, bits: meta ? meta.bits : null, kind: meta ? meta.kind : null};
+
+  // peak, rms, dc, correlation
+  let peak=0, sq=0, dc=0, lr=0, ll=0, rr=0;
+  for (let c=0;c<nch;c++){ const d=chs[c]; for (let i=0;i<len;i++){ const x=d[i]; const a=x<0?-x:x; if(a>peak)peak=a; sq+=x*x; dc+=x; } }
+  if (nch>=2){ const L=chs[0],R=chs[1]; for (let i=0;i<len;i++){ lr+=L[i]*R[i]; ll+=L[i]*L[i]; rr+=R[i]*R[i]; } }
+  r.peak = dB(peak); r.rms = dB(Math.sqrt(sq/(len*nch))); r.dc = dc/(len*nch); r.crest = r.peak - r.rms;
+  if (nch>=2){ r.mid = dB(Math.sqrt((ll+rr+2*lr)/4/len)); r.side = dB(Math.sqrt((ll+rr-2*lr)/4/len)); r.width = r.side - r.mid; r.balance = dB(Math.sqrt(rr/len)) - dB(Math.sqrt(ll/len)); }
+  r.corr = nch>=2 ? lr/Math.sqrt(ll*rr || 1) : 1;
+  await nextFrame();
+
+  // true peak: 4x sinc interpolation around loud samples only
+  let tp = peak; const thr = peak*0.7, T=8, phases=[0.25,0.5,0.75];
+  const sinc = new Float32Array(3*2*T);
+  for (let p=0;p<3;p++) for (let k=-T;k<T;k++){ const t=k-phases[p]; const s = t===0?1:Math.sin(Math.PI*t)/(Math.PI*t); const w = 0.5+0.5*Math.cos(Math.PI*t/T); sinc[p*2*T+k+T] = s*w; }
+  for (let c=0;c<nch;c++){ const d=chs[c];
+    for (let i=T;i<len-T;i++){ const a=d[i]<0?-d[i]:d[i]; if (a<thr) continue;
+      for (let p=0;p<3;p++){ let v=0; const o=p*2*T; for (let k=-T;k<T;k++) v += d[i+k]*sinc[o+k+T]; v=v<0?-v:v; if(v>tp)tp=v; } } }
+  r.tpeak = dB(tp);
+  await nextFrame();
+
+  // loudness: K-weight, 100 ms chunks
+  const chunk = Math.round(fs*0.1), nchunk = Math.floor(len/chunk);
+  const energy = new Float64Array(nchunk);
+  const hs = biquad(fs,'hs'), hp = biquad(fs,'hp');
+  for (let c=0;c<nch;c++){ const y = filt(filt(chs[c],hs),hp);
+    for (let j=0;j<nchunk;j++){ let s=0; const o=j*chunk; for (let i=0;i<chunk;i++) s+=y[o+i]*y[o+i]; energy[j]+=s; } }
+  const blockL = (j,n) => { let s=0; for (let k=0;k<n;k++) s+=energy[j+k]; return -0.691 + 10*Math.log10(s/(n*chunk) || 1e-12); };
+  const mom=[], st=[];
+  for (let j=0;j+4<=nchunk;j++) mom.push(blockL(j,4));
+  for (let j=0;j+30<=nchunk;j++) st.push(blockL(j,30));
+  const gate = (arr, rel) => { let s=0,n=0; for (const l of arr) if (l>-70){ s+=Math.pow(10,(l+0.691)/10); n++; } if(!n) return []; const thr2 = -0.691+10*Math.log10(s/n)+rel; return arr.filter(l=>l>-70 && l>thr2); };
+  const g = gate(mom,-10);
+  r.lufs = g.length ? -0.691+10*Math.log10(g.reduce((s,l)=>s+Math.pow(10,(l+0.691)/10),0)/g.length) : -Infinity;
+  r.momMax = mom.length ? Math.max(...mom) : -Infinity;
+  r.stMax = st.length ? Math.max(...st) : -Infinity;
+  const gs = gate(st,-20).sort((a,b)=>a-b);
+  r.lra = gs.length>1 ? gs[Math.floor(gs.length*0.95)] - gs[Math.floor(gs.length*0.10)] : 0;
+  r.shortTerm = st;
+  await nextFrame();
+
+  // long-term average spectrum (4096, hop 2048), per-channel power averaged
+  const N=4096, hop=2048, bins=N/2, ltas=new Float64Array(bins), tmp=new Float32Array(bins);
+  let frames=0;
+  for (let c=0;c<nch;c++){ const d=chs[c]; for (let o=0;o+N<=len;o+=hop){ fft4k.power(d,o,tmp); for(let i=0;i<bins;i++) ltas[i]+=tmp[i]; frames++; } }
+  for (let i=0;i<bins;i++) ltas[i]/=Math.max(frames,1);
+  r.ltas = ltas; r.binHz = fs/N;
+  // smoothed curve, 1/24 octave from 20 Hz to Nyquist
+  const pts=[]; const fmax=Math.min(20000, fs/2);
+  for (let f=20; f<=fmax; f*=Math.pow(2,1/24)){
+    const lo=Math.max(1,Math.floor(f/Math.pow(2,1/48)/r.binHz)), hi=Math.max(lo,Math.ceil(f*Math.pow(2,1/48)/r.binHz));
+    let s=0,n=0; for (let i=lo;i<=Math.min(hi,bins-1);i++){ s+=ltas[i]; n++; }
+    pts.push([f, 10*Math.log10(s/n || 1e-12)]);
+  }
+  r.curve = pts;
+  const bandsDef = [['Sub',20,60],['Low',60,250],['Low-mid',250,500],['Mid',500,2000],['High-mid',2000,6000],['Air',6000,20000]];
+  r.bands = bandsDef.map(([n,lo,hi]) => { let s=0; for (let i=Math.max(1,Math.round(lo/r.binHz)); i<Math.min(bins,Math.round(hi/r.binHz)); i++) s+=ltas[i]; return [n, 10*Math.log10(s||1e-12)]; });
+  let cs=0,cw=0; for (let i=1;i<bins;i++){ cs+=i*r.binHz*ltas[i]; cw+=ltas[i]; } r.centroid = cs/(cw||1);
+  await nextFrame();
+
+  // waveform envelope cache (recomputed per width) + mono mix for spectrogram
+  const mono = new Float32Array(len); for (let c=0;c<nch;c++){ const d=chs[c]; for (let i=0;i<len;i++) mono[i]+=d[i]/nch; }
+  r.chs = chs; r.mono = mono; r.envCache = {};
+  await nextFrame();
+
+  // tempo: spectral-flux onset envelope → autocorrelation over 60–200 BPM, mild prior toward 90–160
+  {
+    const N1=1024, hop1=512, fr=fs/hop1, nf=Math.floor((len-N1)/hop1);
+    if (nf > fr*8){
+      const flux=new Float32Array(nf), prev=new Float32Array(N1/2), cur=new Float32Array(N1/2);
+      for (let f=0;f<nf;f++){ fft1k.power(mono,f*hop1,cur); let s=0; for (let i=1;i<N1/2;i++){ const d=Math.log10(cur[i]+1e-9)-Math.log10(prev[i]+1e-9); if(d>0)s+=d; prev[i]=cur[i]; } flux[f]=s; }
+      let m=0; for (let f=0;f<nf;f++) m+=flux[f]; m/=nf; for (let f=0;f<nf;f++) flux[f]-=m;
+      const lo=Math.round(fr*60/200), hi=Math.round(fr*60/60); const ac=new Float64Array(hi+1);
+      for (let L=lo;L<=hi;L++){ let s=0; for (let f=0;f+L<nf;f++) s+=flux[f]*flux[f+L]; ac[L]=s/(nf-L); }
+      let best=lo, bs=-Infinity;
+      for (let L=lo;L<=hi;L++){ const bpm=60*fr/L; const prior=Math.exp(-0.5*Math.pow(Math.log2(bpm/120)/0.6,2));
+        let sc=ac[L]; if (2*L<=hi) sc+=0.5*ac[2*L]; sc*=prior; if (sc>bs){bs=sc;best=L;} }
+      let L=best; if (L>lo&&L<hi){ const y0=ac[L-1],y1=ac[L],y2=ac[L+1]; const d=(y0-y2)/(2*(y0-2*y1+y2)||1); if (Math.abs(d)<1) L+=d; }
+      r.bpm = 60*fr/L;
+    }
+  }
+  return r;
+}
+
+function envelope(t, w, t0, t1){
+  const key=w+'|'+t0+'|'+t1; if (t.envCache.key===key) return t.envCache;
+  const peakA=new Float32Array(w), rmsA=new Float32Array(w), s0=t0*t.fs, per=(t1-t0)*t.fs/w;
+  for (let x=0;x<w;x++){ const s=Math.max(0,Math.floor(s0+x*per)), e=Math.min(t.len,Math.max(s+1,Math.floor(s0+(x+1)*per))); if (s>=t.len||e<=s) continue; let p=0,q=0;
+    for (const d of t.chs) for (let i=s;i<e;i++){ const v=d[i], a=v<0?-v:v; if(a>p)p=a; q+=v*v; }
+    peakA[x]=p; rmsA[x]=Math.sqrt(q/((e-s)*t.chs.length)); }
+  return (t.envCache = {key, peak:peakA, rms:rmsA});
+}
+
+/* ---------- state ---------- */
+const S = {batch:[], A:null, B:null, active:'A', playing:false, offset:0, startAt:0, src:{}, gain:{}, ctx:null, master:null, view:null, sel:null};
+const viewOf = () => S.view || {t0:0, t1:maxDur()};
+const tToX = (t,W) => { const v=viewOf(); return W*(t-v.t0)/(v.t1-v.t0); };
+const xToT = (x,W) => { const v=viewOf(); return v.t0 + (v.t1-v.t0)*x/W; };
+const decks = {A:$('#deckA'), B:$('#deckB')};
+const maxDur = () => Math.max(S.A?S.A.dur:0, S.B?S.B.dur:0);
+
+function setDeck(k, state, text, spec){
+  const d = decks[k];
+  d.classList.toggle('loaded', state==='loaded');
+  d.querySelector('.hint').style.display = state==='empty'?'':'none';
+  d.querySelector('.name').textContent = text;
+  d.querySelector('.spec').textContent = spec||'';
+  d.querySelector('.spec').className = 'spec' + (state==='busy'?' busy':'');
+  const t = state==='loaded' ? S[k] : null, st = d.querySelector('.stats');
+  st.innerHTML = t ? [['LUFS',t.lufs.toFixed(1)],['Short-term max',t.stMax.toFixed(1)],['True peak',t.tpeak.toFixed(2)+' dBTP'],['RMS',t.rms.toFixed(1)+' dBFS'],['Crest',t.crest.toFixed(1)+' dB'],['BPM',t.bpm?t.bpm.toFixed(1):'—']]
+    .map(([l,v])=>`<div><b>${v}</b><span>${l}</span></div>`).join('') : '';
+}
+
+async function decodeFile(file, onStage){
+  const buf = await file.arrayBuffer();
+  if (!S.ctx) S.ctx = new (window.AudioContext||window.webkitAudioContext)();
+  let ab, meta = null, wav = decodeWav(buf);
+  if (wav){ ab = S.ctx.createBuffer(wav.nch, wav.length, wav.fs); for (let c=0;c<wav.nch;c++) ab.copyToChannel(wav.chs[c], c); meta = {bits:wav.bits, kind:wav.kind}; }
+  else { ab = await S.ctx.decodeAudioData(buf); }
+  if (onStage) onStage('Analyzing…');
+  await nextFrame();
+  const t = await analyze(wav||ab, meta);
+  t.buffer = ab; t.name = file.name; return t;
+}
+function specLine(t){ const bits=t.bits?(t.kind==='float'?t.bits+'-bit float':t.bits+'-bit'):'decoded'; return `${(t.fs/1000).toFixed(1)} kHz · ${bits} · ${t.nch===1?'mono':t.nch===2?'stereo':t.nch+' ch'} · ${fmtT(t.dur)}`; }
+function setTrack(k, t){ S[k]=t; setDeck(k,'loaded',t.name,specLine(t)); }
+async function addBatch(files){
+  for (const f of files){
+    if (S.batch.some(t=>t.name===f.name)) continue;
+    const ph = {name:f.name, busy:'Decoding…'}; S.batch.push(ph); fillBatch();
+    try{ const t = await decodeFile(f, st=>{ ph.busy=st; fillBatch(); }); S.batch[S.batch.indexOf(ph)] = t; }
+    catch(e){ S.batch.splice(S.batch.indexOf(ph),1); }
+    fillBatch();
+  }
+  if (!S.A && S.batch.length){ setTrack('A', S.batch[0]); S.offset=0; S.view=null; S.sel=null; }
+  if (!S.B && S.batch.length>1){ setTrack('B', S.batch[1]); }
+  refresh();
+}
+async function load(k, file){
+  stop();
+  setDeck(k,'busy', file.name, 'Decoding…');
+  try{
+    const t = await decodeFile(file, st=>setDeck(k,'busy',file.name,st));
+    S[k] = t;
+    const bits = t.bits ? (t.kind==='float'? t.bits+'-bit float' : t.bits+'-bit') : 'decoded';
+    setDeck(k,'loaded', file.name, `${(t.fs/1000).toFixed(1)} kHz · ${bits} · ${t.nch===1?'mono':t.nch===2?'stereo':t.nch+' ch'} · ${fmtT(t.dur)}`);
+  }catch(e){
+    S[k]=null; setDeck(k,'empty', k==='A'?'Reference':'Your mix', 'Could not decode: '+(e.message||e));
+  }
+  S.offset = 0; S.view = null; S.sel = null;
+  refresh();
+}
+
+function refresh(){
+  const any = S.A||S.B;
+  $('#png').disabled = !any; $('#play').disabled = !any; $('#selA').disabled = !S.A; $('#selB').disabled = !S.B; $('#swap').disabled = $('#copy').disabled = !any;
+  if (!S[S.active]) S.active = S.A?'A':'B';
+  setActive(S.active);
+  drawWave(); drawSpectrum(); drawGrams(); fillTables(); drawCursor(); drawGonio(); fillBatch();
+}
+
+/* ---------- playback ---------- */
+function applyGains(){
+  const match = $('#optMatch').checked;
+  let gA=1,gB=1;
+  if (match && S.A && S.B && isFinite(S.A.lufs) && isFinite(S.B.lufs)){
+    const d = S.A.lufs - S.B.lufs; if (d>0) gA = Math.pow(10,-d/20); else gB = Math.pow(10,d/20);
+  }
+  const t = S.ctx ? S.ctx.currentTime : 0;
+  if (S.gain.A) S.gain.A.gain.setTargetAtTime(S.active==='A'?gA:0, t, 0.004);
+  if (S.gain.B) S.gain.B.gain.setTargetAtTime(S.active==='B'?gB:0, t, 0.004);
+}
+function setActive(k){
+  if (!S[k]) return;
+  S.active = k;
+  $('#selA').classList.toggle('on', k==='A'); $('#selB').classList.toggle('on', k==='B');
+  applyGains(); drawGonio();
+}
+function play(){
+  if (!(S.A||S.B)) return;
+  S.ctx.resume();
+  const end = S.sel ? S.sel.s1 : maxDur();
+  if (S.offset >= end || (S.sel && S.offset < S.sel.s0)) S.offset = S.sel ? S.sel.s0 : 0;
+  if (!S.master){ S.master = S.ctx.createGain(); S.master.connect(S.ctx.destination); }
+  for (const k of ['A','B']){ if (!S[k]) continue;
+    const g = S.ctx.createGain(); g.gain.value = 0; g.connect(S.master);
+    const src = S.ctx.createBufferSource(); src.buffer = S[k].buffer; src.connect(g);
+    S.gain[k]=g; S.src[k]=src;
+    if (S.offset < S[k].dur) src.start(0, S.offset);
+  }
+  S.startAt = S.ctx.currentTime; S.playing = true; applyGains();
+  $('#icoPlay').style.display='none'; $('#icoPause').style.display='';
+  requestAnimationFrame(tick);
+}
+function stop(){
+  if (!S.playing) return;
+  S.offset = pos();
+  for (const k of ['A','B']){ try{ S.src[k] && S.src[k].stop(); }catch(e){} S.src[k]=null; S.gain[k]=null; }
+  S.playing=false;
+  $('#icoPlay').style.display=''; $('#icoPause').style.display='none';
+  drawCursor();
+}
+const pos = () => S.playing ? S.offset + (S.ctx.currentTime - S.startAt) : S.offset;
+function seek(t){ const was=S.playing; stop(); S.offset = Math.min(Math.max(0,t), maxDur()); drawCursor(); drawGonio(); if (was) play(); }
+function tick(){
+  if (!S.playing) return;
+  const end = S.sel ? S.sel.s1 : maxDur();
+  if (pos() >= end){ stop(); S.offset = S.sel ? S.sel.s0 : 0; if ($('#optLoop').checked) play(); else { S.offset = end; drawCursor(); } return; }
+  if (S.view && pos() > S.view.t1){ const vis=S.view.t1-S.view.t0; S.view={t0:Math.min(pos(),maxDur()-vis), t1:0}; S.view.t1=S.view.t0+vis; drawWave(); }
+  drawCursor(); drawGonio(); requestAnimationFrame(tick);
+}
+
+/* ---------- drawing ---------- */
+function sizeCanvas(c){ const r=c.getBoundingClientRect(), dpr=window.devicePixelRatio||1; c.width=Math.round(r.width*dpr); c.height=Math.round(r.height*dpr); const g=c.getContext('2d'); g.setTransform(dpr,0,0,dpr,0,0); return [g, r.width, r.height]; }
+
+function drawWave(){
+  const [g,W,H] = sizeCanvas($('#wave'));
+  g.clearRect(0,0,W,H); g.fillStyle=css('--deep'); g.fillRect(0,0,W,H);
+  const overlay = $('#optOverlay').checked, D = maxDur();
+  if (!D) { g.fillStyle=css('--dim'); g.font='14px Space Grotesk, sans-serif'; g.textAlign='center'; g.fillText('Nothing loaded yet', W/2, H/2); return; }
+  const lanes = overlay ? [['A',0,H],['B',0,H]] : [['A',0,H/2],['B',H/2,H/2]];
+  const v = viewOf(), vis = v.t1-v.t0;
+  for (const [k,y0,h] of lanes){ const t=S[k]; if(!t) continue;
+    const px = Math.round(W), env = envelope(t,px,v.t0,v.t1), mid=y0+h/2, amp=h/2-4;
+    g.fillStyle = COL[k]; g.globalAlpha = overlay?0.35:0.45;
+    g.beginPath(); for (let x=0;x<px;x++) g.lineTo(x, mid-env.peak[x]*amp); for (let x=px-1;x>=0;x--) g.lineTo(x, mid+env.peak[x]*amp); g.closePath(); g.fill();
+    g.globalAlpha = overlay?0.75:1;
+    g.beginPath(); for (let x=0;x<px;x++) g.lineTo(x, mid-env.rms[x]*amp); for (let x=px-1;x>=0;x--) g.lineTo(x, mid+env.rms[x]*amp); g.closePath(); g.fill();
+    g.globalAlpha = 1;
+  }
+  // zero lines + time ticks
+  g.strokeStyle=css('--grid'); g.lineWidth=1;
+  for (const [,y0,h] of (overlay?[lanes[0]]:lanes)){ g.beginPath(); g.moveTo(0,y0+h/2+.5); g.lineTo(W,y0+h/2+.5); g.stroke(); }
+  const step = [0.1,0.2,0.5,1,2,5,10,30,60,120,300,600].find(st=>vis/st<=12) || 600;
+  g.fillStyle=css('--dim'); g.font='11px Space Grotesk, sans-serif'; g.textAlign='left';
+  for (let s=Math.ceil(v.t0/step)*step; s<v.t1; s+=step){ const x=tToX(s,W); g.fillRect(x,H-10,1,10); g.fillText(step<1?fmtT(s):fmtT(s).replace(/\.\d$/,''), x+3, H-3); }
+}
+function drawCursor(){
+  const c=$('#cursor'), [g,W,H]=sizeCanvas(c); g.clearRect(0,0,W,H);
+  const D=maxDur(); if(!D) return;
+  if (S.sel){ const x0=tToX(S.sel.s0,W), x1=tToX(S.sel.s1,W); g.fillStyle=css('--band'); g.fillRect(x0,0,x1-x0,H); g.fillStyle=css('--muted'); g.fillRect(x0,0,1,H); g.fillRect(x1-1,0,1,H); }
+  const x = tToX(pos(),W);
+  g.fillStyle = COL[S.active]; g.fillRect(x-1,0,2,H);
+  $('#time').innerHTML = `${fmtT(pos())} <span>/ ${fmtT(D)}</span>`;
+}
+
+function drawSpectrum(){
+  const [g,W,H] = sizeCanvas($('#spec'));
+  g.clearRect(0,0,W,H);
+  const both = !!(S.A&&S.B), DH = both?64:0;
+  const L=46, R=10, T=10, B=24+DH, w=W-L-R, h=H-T-B, fmin=20, fmax=20000, dmin=-96, dmax=0;
+  const X=f=>L+w*Math.log(f/fmin)/Math.log(fmax/fmin), Y=d=>T+h*(dmax-Math.min(dmax,Math.max(dmin,d)))/(dmax-dmin);
+  g.font='11px Space Grotesk, sans-serif'; g.fillStyle=css('--dim'); g.strokeStyle=css('--grid'); g.lineWidth=1;
+  for (const f of [20,50,100,200,500,1000,2000,5000,10000,20000]){ const x=X(f); g.beginPath(); g.moveTo(x,T); g.lineTo(x,T+h); g.stroke(); g.textAlign='center'; g.fillText(f>=1000?f/1000+'k':f, x, H-8); }
+  for (let d=dmax; d>=dmin; d-=12){ const y=Y(d); g.beginPath(); g.moveTo(L,y); g.lineTo(L+w,y); g.stroke(); g.textAlign='right'; g.fillText(d, L-6, y+4); }
+  if (!(S.A||S.B)) return;
+  if (both){ // difference strip: B − A, ±18 dB
+    const dT=T+h+22, dh=DH-10, mid=dT+dh/2, rng=18;
+    g.fillStyle=css('--band'); g.fillRect(L,dT,w,dh);
+    g.strokeStyle=css('--grid'); g.beginPath(); g.moveTo(L,mid+.5); g.lineTo(L+w,mid+.5); g.stroke();
+    g.fillStyle=css('--dim'); g.textAlign='right'; g.fillText('+'+rng, L-6, dT+9); g.fillText('−'+rng, L-6, dT+dh); g.fillText('Δ', L-6, mid+4);
+    const n=Math.min(S.A.curve.length,S.B.curve.length);
+    g.beginPath(); g.moveTo(X(S.A.curve[0][0]),mid);
+    for (let i=0;i<n;i++){ const d=Math.max(-rng,Math.min(rng,S.B.curve[i][1]-S.A.curve[i][1])); g.lineTo(X(S.A.curve[i][0]), mid-d*dh/2/rng); }
+    g.lineTo(X(S.A.curve[n-1][0]),mid); g.closePath();
+    g.save(); g.clip(); g.fillStyle=COL.B; g.globalAlpha=.55; g.fillRect(L,dT,w,dh/2); g.fillStyle=COL.A; g.fillRect(L,mid,w,dh/2); g.restore(); g.globalAlpha=1;
+  }
+  for (const k of ['A','B']){ const t=S[k]; if(!t) continue;
+    g.strokeStyle=COL[k]; g.lineWidth=1.6; g.beginPath();
+    t.curve.forEach(([f,d],i)=> i?g.lineTo(X(f),Y(d)):g.moveTo(X(f),Y(d))); g.stroke();
+    g.globalAlpha=.12; g.fillStyle=COL[k]; g.lineTo(X(t.curve[t.curve.length-1][0]),T+h); g.lineTo(X(20),T+h); g.closePath(); g.fill(); g.globalAlpha=1;
+  }
+  $('#spec').onmousemove = e => {
+    const r=$('#spec').getBoundingClientRect(), x=e.clientX-r.left;
+    if (x<L||x>L+w) return;
+    const f = fmin*Math.pow(fmax/fmin,(x-L)/w);
+    const val = k => { const t=S[k]; if(!t) return null; let best=t.curve[0]; for (const p of t.curve) if (Math.abs(Math.log(p[0]/f))<Math.abs(Math.log(best[0]/f))) best=p; return best[1]; };
+    const a=val('A'), b=val('B');
+    let s = (f>=1000?(f/1000).toFixed(2)+' kHz':Math.round(f)+' Hz');
+    if (a!==null) s += `  ·  A ${a.toFixed(1)}`; if (b!==null) s += `  ·  B ${b.toFixed(1)}`;
+    if (a!==null&&b!==null) s += `  ·  Δ ${(b-a>=0?'+':'')+(b-a).toFixed(1)} dB`;
+    $('#specRead').textContent = s;
+  };
+}
+
+function drawGrams(){
+  for (const k of ['A','B']){
+    const c=$('#gram'+k), [g,W,H]=sizeCanvas(c); g.clearRect(0,0,W,H);
+    const t=S[k]; if(!t) continue;
+    const cols=Math.min(c.width,1600), rows=c.height, N=2048, bins=N/2, hop=Math.max(1,Math.floor((t.len-N)/cols));
+    const img=g.createImageData(cols,rows), d=img.data, pw=new Float32Array(bins);
+    const fmin=20, fmax=Math.min(20000,t.fs/2), binHz=t.fs/N;
+    const rowBin=new Int32Array(rows+1); for (let y=0;y<=rows;y++) rowBin[y]=Math.max(1,Math.round(fmin*Math.pow(fmax/fmin,1-y/rows)/binHz));
+    for (let x=0;x<cols;x++){ fft2k.power(t.mono,x*hop,pw);
+      for (let y=0;y<rows;y++){ let b0=rowBin[y+1], b1=Math.max(b0+1,rowBin[y]); let m=0; for (let b=b0;b<b1&&b<bins;b++) if(pw[b]>m)m=pw[b];
+        const v = Math.min(1,Math.max(0,(10*Math.log10(m||1e-12)+90)/90)); const o=(y*cols+x)*4;
+        // dark navy → hue of the track → white
+        const [cr,cg,cb] = css(k==='A'?'--a-rgb':'--b-rgb').split(',').map(Number), [dr,dg,db2] = css('--deep-rgb').split(',').map(Number), light = dr>128;
+        const t2=Math.pow(v,1.6), hot=Math.max(0,v-.85)*4, hr=light?0:255; d[o]=dr+(cr-dr)*t2+(hr-cr)*hot; d[o+1]=dg+(cg-dg)*t2+(hr-cg)*hot; d[o+2]=db2+(cb-db2)*t2+(hr-cb)*hot; d[o+3]=255; } }
+    g.setTransform(1,0,0,1,0,0); g.putImageData(img,0,0);
+    if (cols<c.width){ g.drawImage(c,0,0,cols,rows,0,0,c.width,rows); }
+  }
+}
+
+/* ---------- tables ---------- */
+function fillTables(){
+  const A=S.A, B=S.B;
+  const f = (v,d=1,u='') => v==null||v===undefined?'':(v===-Infinity?'−∞':(typeof v==='number'?v.toFixed(d):v)+u);
+  const row = (name, va, vb, d=1, u='', delta=true) => {
+    const dv = (delta && typeof va==='number' && typeof vb==='number' && isFinite(va) && isFinite(vb)) ? vb-va : null;
+    const cls = dv===null?'d':'d'+(dv>=0.05?' pos':'')+(Math.abs(dv)>=1?' big':'');
+    return `<tr><td>${name}</td><td>${f(va,d,u)}</td><td>${f(vb,d,u)}</td><td class="${cls}">${dv===null?'':dv.toFixed(d)}</td></tr>`;
+  };
+  const head = `<tr><th>B − A</th><th class="A">A</th><th class="B">B</th><th>Δ</th></tr>`;
+  if (!(A||B)){ return; }
+  const g = (k,p) => S[k]?S[k][p]:null;
+  $('#tblLevel').innerHTML = head +
+    row('Integrated loudness, LUFS', g('A','lufs'), g('B','lufs')) +
+    row('Short-term max, LUFS', g('A','stMax'), g('B','stMax')) +
+    row('Momentary max, LUFS', g('A','momMax'), g('B','momMax')) +
+    row('Loudness range, LU', g('A','lra'), g('B','lra')) +
+    row('True peak, dBTP', g('A','tpeak'), g('B','tpeak'), 2) +
+    row('Sample peak, dBFS', g('A','peak'), g('B','peak'), 2) +
+    row('RMS, dBFS', g('A','rms'), g('B','rms')) +
+    row('Crest factor, dB', g('A','crest'), g('B','crest')) +
+    row('Stereo correlation', g('A','corr'), g('B','corr'), 2) +
+    row('DC offset', g('A','dc')==null?null:g('A','dc')*1000, g('B','dc')==null?null:g('B','dc')*1000, 2, ' ‰') +
+    row('Spectral centroid, Hz', g('A','centroid'), g('B','centroid'), 0) +
+    row('Tempo estimate, BPM', g('A','bpm'), g('B','bpm'), 1) +
+    row('Sample rate', A?A.fs+' Hz':null, B?B.fs+' Hz':null, 0, '', false) +
+    row('Bit depth', A?(A.bits?A.bits+(A.kind==='float'?' float':''):'n/a'):null, B?(B.bits?B.bits+(B.kind==='float'?' float':''):'n/a'):null, 0, '', false) +
+    row('Length', A?fmtT(A.dur):null, B?fmtT(B.dur):null, 0, '', false);
+  $('#tblStereo').innerHTML = head +
+    row('Correlation', g('A','corr'), g('B','corr'), 2) +
+    row('Width S−M, dB', g('A','width'), g('B','width')) +
+    row('Mid, dBFS', g('A','mid'), g('B','mid')) +
+    row('Side, dBFS', g('A','side'), g('B','side')) +
+    row('Balance R−L, dB', g('A','balance'), g('B','balance'));
+  const names = (A||B).bands.map(b=>b[0]);
+  $('#tblBands').innerHTML = head + names.map((n,i)=>row(n+' '+['20–60','60–250','250–500','500–2k','2k–6k','6k–20k'][i]+' Hz', A?A.bands[i][1]:null, B?B.bands[i][1]:null)).join('');
+}
+
+function fillBatch(){
+  const tb=$('#tblBatch'); if (!S.batch.length){ tb.innerHTML='<tr><td class="empty" colspan="11">Drop a folder\'s worth of mixes anywhere on the page, or add files</td></tr>'; return; }
+  const f=(v,d)=>v==null||!isFinite(v)?'':v.toFixed(d);
+  const A=S.A; const d=(v)=>{ if(!A||v==null||A.lufs==null) return ''; const x=v-A.lufs; return (x>=0?'+':'')+x.toFixed(1); };
+  tb.innerHTML = '<tr><th>File</th><th>LUFS</th><th>Δ vs A</th><th>ST max</th><th>True peak</th><th>RMS</th><th>Crest</th><th>Corr</th><th>Width</th><th>Centroid</th><th>BPM</th></tr>' +
+    S.batch.map((t,i)=> t.busy ? `<tr><td>${t.name}</td><td colspan="10" style="text-align:left;color:var(--muted)">${t.busy}</td></tr>` :
+      `<tr class="row${t===S.A?' isA':t===S.B?' isB':''}" data-i="${i}"><td>${t.name}${t===S.A?' (A)':t===S.B?' (B)':''}</td><td>${f(t.lufs,1)}</td><td>${d(t.lufs)}</td><td>${f(t.stMax,1)}</td><td>${f(t.tpeak,2)}</td><td>${f(t.rms,1)}</td><td>${f(t.crest,1)}</td><td>${f(t.corr,2)}</td><td>${f(t.width,1)}</td><td>${f(t.centroid,0)}</td><td>${f(t.bpm,1)}</td></tr>`).join('');
+  tb.querySelectorAll('tr.row').forEach(tr=> tr.onclick = e=>{ const t=S.batch[+tr.dataset.i]; if (t===S.A) return; stop(); setTrack(e.shiftKey?'A':'B', t); S.offset=0; S.view=null; S.sel=null; refresh(); });
+}
+
+function drawGonio(){
+  const c=$('#gonio'), [g,W,H]=sizeCanvas(c); g.clearRect(0,0,W,H);
+  const t=S[S.active]; const cx=W/2, cy=H/2, r=Math.min(W,H)/2-6;
+  g.strokeStyle=css('--grid'); g.lineWidth=1; g.beginPath(); g.moveTo(cx,cy-r); g.lineTo(cx,cy+r); g.moveTo(cx-r,cy); g.lineTo(cx+r,cy); g.moveTo(cx-r*.7,cy-r*.7); g.lineTo(cx+r*.7,cy+r*.7); g.moveTo(cx-r*.7,cy+r*.7); g.lineTo(cx+r*.7,cy-r*.7); g.stroke();
+  g.fillStyle=css('--dim'); g.font='10px Space Grotesk, sans-serif'; g.textAlign='center'; g.fillText('L', cx-r*.72, cy-r*.76); g.fillText('R', cx+r*.72, cy-r*.76); g.fillText('M', cx, cy-r+2);
+  if (!t || t.nch<2) { $('#stereoRead').textContent = t?'mono':''; return; }
+  const L=t.chs[0], R=t.chs[1], n=Math.min(4096,t.len), s=Math.max(0,Math.min(t.len-n, Math.floor(pos()*t.fs)));
+  let pk=0; for (let i=s;i<s+n;i++){ const a=Math.abs(L[i]),b=Math.abs(R[i]); if(a>pk)pk=a; if(b>pk)pk=b; }
+  const sc = r*0.95/Math.max(pk,0.05);
+  g.fillStyle=COL[S.active]; g.globalAlpha=.6;
+  for (let i=s;i<s+n;i++){ const x=(R[i]-L[i])*0.7071*sc, y=(L[i]+R[i])*0.7071*sc; g.fillRect(cx+x, cy-y, 1.2, 1.2); }
+  g.globalAlpha=1;
+  // instantaneous correlation
+  let lr=0,ll=0,rr=0; for (let i=s;i<s+n;i++){ lr+=L[i]*R[i]; ll+=L[i]*L[i]; rr+=R[i]*R[i]; }
+  $('#stereoRead').textContent = `${S.active} · corr ${(lr/Math.sqrt(ll*rr||1)).toFixed(2)} at ${fmtT(pos())}`;
+}
+
+$('#png').onclick = ()=>{
+  const W=1400, pad=24, dpr=2; const srcs=['#wave','#spec','#gramA','#gramB'].map(id=>$(id));
+  const tl = $('#tblLevel').querySelectorAll('tr'), tbb=$('#tblBands').querySelectorAll('tr');
+  const rows = Math.max(tl.length,tbb.length), th=18, tableH=rows*th+30;
+  const H = pad+70+tableH + srcs.reduce((h,c)=>h+ (c.getBoundingClientRect().height*W/c.getBoundingClientRect().width)+pad, 0);
+  const o=document.createElement('canvas'); o.width=W*dpr; o.height=H*dpr; const g=o.getContext('2d'); g.scale(dpr,dpr);
+  g.fillStyle=css('--bg'); g.fillRect(0,0,W,H);
+  g.fillStyle=css('--ink'); g.font='600 22px Space Grotesk, sans-serif'; g.fillText('Wav Watcher', pad, pad+22);
+  g.font='13px Space Grotesk, sans-serif'; g.fillStyle=COL.A; g.fillText('A  '+(S.A?S.A.name:'—'), pad, pad+48); g.fillStyle=COL.B; g.fillText('B  '+(S.B?S.B.name:'—'), pad+W/2, pad+48);
+  let y=pad+70;
+  const drawTable = (trs, x0, w) => { let yy=y; for (const tr of trs){ const c=[...tr.children].map(x=>x.textContent.trim()); if(c.length!==4) continue;
+    g.fillStyle=css('--muted'); g.textAlign='left'; g.fillText(c[0], x0, yy+13); g.fillStyle=css('--ink'); g.textAlign='right'; g.fillText(c[1], x0+w*.62, yy+13); g.fillText(c[2], x0+w*.8, yy+13); g.fillStyle=css('--muted'); g.fillText(c[3], x0+w, yy+13); yy+=th; } };
+  drawTable(tl, pad, W/2-pad*1.5); drawTable(tbb, W/2+pad/2, W/2-pad*1.5); g.textAlign='left';
+  y += tableH;
+  for (const c of srcs){ const r=c.getBoundingClientRect(), h=r.height*(W-2*pad)/r.width; g.drawImage(c, pad, y, W-2*pad, h); y+=h+pad; }
+  const a=document.createElement('a'); a.download='wav-watcher-'+(S.A?S.A.name.replace(/\.[^.]+$/,''):'report')+'.png'; a.href=o.toDataURL('image/png'); document.body.appendChild(a); a.click(); a.remove();
+};
+
+/* ---------- events ---------- */
+for (const k of ['A','B']){
+  const d=decks[k], inp=d.querySelector('input');
+  inp.addEventListener('change', ()=>{ if(inp.files[0]) load(k, inp.files[0]); inp.value=''; });
+  d.addEventListener('dragover', e=>{ e.preventDefault(); e.stopPropagation(); d.classList.add('over'); });
+  d.addEventListener('dragleave', ()=>d.classList.remove('over'));
+  d.addEventListener('drop', e=>{ e.preventDefault(); e.stopPropagation(); d.classList.remove('over'); const fs=[...e.dataTransfer.files]; if(!fs.length) return;
+    if (fs.length>=3) addBatch(fs); else if (fs.length===2){ load('A',fs[0]).then(()=>load('B',fs[1])); } else load(k,fs[0]); });
+  d.addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); inp.click(); } });
+}
+// drop anywhere else: fill A then B
+document.addEventListener('dragover', e=>e.preventDefault());
+document.addEventListener('drop', e=>{ e.preventDefault(); const fs=[...e.dataTransfer.files]; if(!fs.length) return;
+  if (fs.length>=3) addBatch(fs); else if (fs.length===2) load('A',fs[0]).then(()=>load('B',fs[1])); else load(!S.A?'A':!S.B?'B':'B', fs[0]); });
+$('#addBatch').onclick = ()=>$('#batchInput').click();
+$('#batchInput').onchange = e=>{ addBatch([...e.target.files]); e.target.value=''; };
+
+$('#play').onclick = ()=> S.playing?stop():play();
+$('#selA').onclick = ()=>setActive('A'); $('#selB').onclick = ()=>setActive('B');
+$('#optMatch').onchange = applyGains;
+$('#optOverlay').onchange = drawWave;
+const cur=$('#cursor'); let drag=null;
+const evT = e => { const r=cur.getBoundingClientRect(); return [Math.min(Math.max(0,xToT(e.clientX-r.left, r.width)),maxDur()), e.clientX-r.left]; };
+cur.addEventListener('mousedown', e=>{ if(!maxDur()) return; const [t,x]=evT(e); drag={t,x,moved:false}; });
+window.addEventListener('mousemove', e=>{ if(!drag) return; const [t,x]=evT(e); if (Math.abs(x-drag.x)>3) drag.moved=true;
+  if (drag.moved){ S.sel={s0:Math.min(drag.t,t), s1:Math.max(drag.t,t)}; drawCursor(); } });
+window.addEventListener('mouseup', e=>{ if(!drag) return; const [t]=evT(e); if (!drag.moved) seek(t); else if (S.sel && S.sel.s1-S.sel.s0<0.02) S.sel=null; drag=null; drawCursor(); });
+cur.addEventListener('dblclick', ()=>{ S.sel=null; drawCursor(); });
+cur.addEventListener('mousemove', e=>{ if(!maxDur()) return; const [t]=evT(e); const v=viewOf(); const z=maxDur()/(v.t1-v.t0);
+  $('#waveRead').textContent = fmtT(t) + (S.sel?`  ·  sel ${fmtT(S.sel.s0)}–${fmtT(S.sel.s1)} (${(S.sel.s1-S.sel.s0).toFixed(2)} s)`:'') + (z>1.01?`  ·  ${z.toFixed(1)}×`:''); });
+cur.addEventListener('mouseleave', ()=>$('#waveRead').textContent='');
+cur.addEventListener('wheel', e=>{ const D=maxDur(); if(!D) return; e.preventDefault();
+  const v=viewOf(), vis=v.t1-v.t0, r=cur.getBoundingClientRect(), fx=(e.clientX-r.left)/r.width, tAt=v.t0+vis*fx;
+  let t0,t1;
+  if (e.shiftKey || Math.abs(e.deltaX)>Math.abs(e.deltaY)){ const d=(e.deltaX||e.deltaY)*vis/600; t0=v.t0+d; t1=v.t1+d; }
+  else { const f=Math.exp(e.deltaY*0.0015); const nv=Math.min(D,Math.max(0.05,vis*f)); t0=tAt-nv*fx; t1=t0+nv; }
+  if (t0<0){ t1-=t0; t0=0; } if (t1>D){ t0-=t1-D; t1=D; t0=Math.max(0,t0); }
+  S.view = (t1-t0>=D-1e-6) ? null : {t0,t1}; drawWave(); drawCursor(); }, {passive:false});
+$('#swap').onclick = ()=>{ stop(); [S.A,S.B]=[S.B,S.A]; for (const k of ['A','B']){ const t=S[k]; if(t){ const bits=t.bits?(t.kind==='float'?t.bits+'-bit float':t.bits+'-bit'):'decoded'; setDeck(k,'loaded',t.name,`${(t.fs/1000).toFixed(1)} kHz · ${bits} · ${t.nch===1?'mono':t.nch===2?'stereo':t.nch+' ch'} · ${fmtT(t.dur)}`);} else setDeck(k,'empty',k==='A'?'Reference':'Your mix',''); } S.active=S.active==='A'?'B':'A'; refresh(); };
+$('#copy').onclick = async ()=>{ const lines=[`Wav Watcher report — A: ${S.A?S.A.name:'—'} · B: ${S.B?S.B.name:'—'}`,''];
+  for (const tb of ['#tblLevel','#tblBands']){ for (const tr of $(tb).querySelectorAll('tr')){ const c=[...tr.children].map(x=>x.textContent.trim()); if (c.length===4) lines.push(c.map((x,i)=>i?x.padStart(10):x.padEnd(28)).join('')); } lines.push(''); }
+  try{ await navigator.clipboard.writeText(lines.join('\n')); $('#copy').textContent='Copied'; setTimeout(()=>$('#copy').textContent='Copy report',1500); }catch(e){ $('#copy').textContent='Copy failed'; } };
+
+document.addEventListener('keydown', e=>{
+  if (e.target.tagName==='INPUT' && e.target.type!=='checkbox') return;
+  const k=e.key.toLowerCase();
+  if (k===' '){ e.preventDefault(); if (S.A||S.B) S.playing?stop():play(); }
+  else if (k==='a') setActive('A');
+  else if (k==='b') setActive('B');
+  else if (k==='tab'||k==='t'){ e.preventDefault(); setActive(S.active==='A'?'B':'A'); }
+  else if (k==='arrowleft') seek(pos()-5);
+  else if (k==='arrowright') seek(pos()+5);
+  else if (k==='home') seek(S.sel?S.sel.s0:0);
+  else if (k==='z'){ S.view=null; drawWave(); drawCursor(); }
+  else if (k==='escape'){ S.sel=null; drawCursor(); }
+});
+function setTheme(t){ document.documentElement.dataset.theme=t; $('#theme').value=t; COL={A:css('--a'),B:css('--b')}; try{ localStorage.setItem('ww-theme',t); }catch(e){} refresh(); }
+$('#theme').onchange = e=> setTheme(e.target.value);
+try{ const t=localStorage.getItem('ww-theme'); if (t && $('#theme').querySelector(`option[value="${t}"]`)) setTheme(t); }catch(e){}
+let rt; window.addEventListener('resize', ()=>{ clearTimeout(rt); rt=setTimeout(refresh,120); });
+refresh();
+})();
+</script>
+</body>
+</html>
